@@ -18,10 +18,14 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Stage 2: Serve with Nginx
-FROM nginx:stable-alpine
+# Unprivileged variant listens on 8080 and runs as a non-root user (uid 101) out of the box,
+# so we don't need root in the container just to bind to port 80.
+FROM nginxinc/nginx-unprivileged:stable-alpine
 
 # Remove default Nginx static assets
+USER root
 RUN rm -rf /usr/share/nginx/html/*
+USER nginx
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -29,8 +33,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy custom Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80
-EXPOSE 80
+# Expose port 8080
+EXPOSE 8080
 
 # Health check
 #HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

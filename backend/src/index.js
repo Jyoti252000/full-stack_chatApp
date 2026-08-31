@@ -28,6 +28,11 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
+// Used by Kubernetes liveness/readiness probes — keep this above the SPA catch-all route.
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
