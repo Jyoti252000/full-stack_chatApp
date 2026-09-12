@@ -1,0 +1,58 @@
+name: CI - Build, Scan, Push
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: eu-west-1
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # this is a sanity check that dependencies actually install cleanly.
+      - name: Install dependencies (sanity check)
+        run: npm install
+        working-directory: ./${{ matrix.service }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t chatapp-${{ matrix.service }}:${{ github.sha }} ./${{ matrix.service }}
+
+      # ECR repos are configured with IMMUTABLE tags (see ecr.tf) — every image
+      # must have a unique tag, so we use the commit SHA, never "latest".
+      - name: Scan image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: chatapp-${{ matrix.service }}:${{ github.sha }}
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Tag image for ECR
+        run: |
+          docker tag chatapp-${{ matrix.service }}:${{ github.sha }} \
+            ${{ steps.ecr-login.outputs.registry }}/chatapp-${{ matrix.service }}:${{ github.sha }}
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ steps.ecr-login.outputs.registry }}/chatapp-${{ matrix.service }}:${{ github.sha }}
