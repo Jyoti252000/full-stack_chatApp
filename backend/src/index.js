@@ -41,7 +41,19 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+/*
 server.listen(PORT, () => {
   console.log("server is running on PORT:" + PORT);
   connectDB();
 });
+*/
+
+if (process.env.NODE_ENV !== "test") {
+  server.listen(PORT, () => {
+    console.log("server is running on PORT:" + PORT);
+    connectDB();
+  });
+}
+
+export default app;
+

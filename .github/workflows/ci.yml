@@ -1,4 +1,4 @@
-name: CI - Build, Scan, Push
+name: CI - Test, Build, Scan, Push
 
 on:
   push:
@@ -8,7 +8,30 @@ env:
   AWS_REGION: eu-west-1
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: ./backend
+
+      # Quality gate: if any test fails, no image is built or pushed.
+      - name: Run unit and API tests (Jest)
+        run: npm test
+        working-directory: ./backend
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
